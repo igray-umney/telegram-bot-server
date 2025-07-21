@@ -1,28 +1,48 @@
 console.log('🔄 Запуск сервера...');
 
+// Устанавливаем часовой пояс Москвы
+process.env.TZ = 'Europe/Moscow';
+console.log('🌍 Часовой пояс установлен:', process.env.TZ);
+
 require('dotenv').config();
 console.log('📁 .env файл загружен');
 
 const express = require('express');
-console.log('📦 Express загружен');
-
 const cors = require('cors');
-console.log('📦 CORS загружен');
-
 const TelegramBot = require('node-telegram-bot-api');
-console.log('📦 TelegramBot загружен');
-
 const cron = require('node-cron');
-console.log('📦 node-cron загружен');
-
 const fs = require('fs');
 
-console.log('🔄 Запуск сервера...');
-// Устанавливаем часовой пояс Москвы
-process.env.TZ = 'Europe/Moscow';
+console.log('📦 Все модули загружены');
 
-// ДОБАВЬ ЭТИ ФУНКЦИИ:
-// Функция сохранения данных в файл
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Конфигурация
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const APP_URL = process.env.APP_URL || 'https://telegram-mini-app-gules-nine.vercel.app/';
+
+console.log('🔑 BOT_TOKEN найден:', !!BOT_TOKEN);
+console.log('🌐 APP_URL:', APP_URL);
+
+if (!BOT_TOKEN) {
+  console.error('❌ Ошибка: BOT_TOKEN не найден в .env файле');
+  process.exit(1);
+}
+
+// Создаем бота
+const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+console.log('🤖 Бот создан с polling');
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// База данных пользователей
+let users = new Map();
+let notifications = new Map();
+
+// Функции для работы с данными
 function saveData() {
   const data = {
     users: Array.from(users.entries()),
@@ -38,7 +58,6 @@ function saveData() {
   }
 }
 
-// Функция загрузки данных из файла
 function loadData() {
   try {
     if (fs.existsSync('data.json')) {
@@ -54,47 +73,14 @@ function loadData() {
   }
 }
 
-const app = express();
-const PORT = process.env.PORT || 5000;
-console.log('🔧 Express app создан, порт:', PORT);
-
-// Конфигурация
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const APP_URL = process.env.APP_URL || 'https://your-app.netlify.app';
-
-console.log('🔑 BOT_TOKEN найден:', !!BOT_TOKEN);
-console.log('🌐 APP_URL:', APP_URL);
-
-if (!BOT_TOKEN) {
-  console.error('❌ Ошибка: BOT_TOKEN не найден в .env файле');
-  process.exit(1);
-}
-
-console.log('✅ Создаём бота...');
-
-// Создаем бота
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
-console.log('🤖 Бот создан с polling');
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// База данных пользователей (в реальном проекте используй MongoDB/PostgreSQL)
-let users = new Map();
-let notifications = new Map();
-
-// ДОБАВЬ СРАЗУ ПОСЛЕ:
-console.log('📂 Загружаем сохранённые данные...');
+console.log('💾 База данных инициализирована');
 loadData();
 
-// Сохраняем данные каждые 5 минут
+// Автосохранение каждые 5 минут
 setInterval(() => {
   console.log('🔄 Автосохранение данных...');
   saveData();
 }, 5 * 60 * 1000);
-
-console.log('💾 База данных инициализирована');
 
 // Обработчики команд бота
 bot.onText(/\/start/, (msg) => {
@@ -114,6 +100,8 @@ bot.onText(/\/start/, (msg) => {
     notifications: false
   });
 
+  saveData();
+
   const welcomeMessage = `🌟 Добро пожаловать в Развивайка!
 
 Привет, ${firstName}! Это бот для напоминаний о развивающих занятиях с детьми.
@@ -125,6 +113,8 @@ bot.onText(/\/start/, (msg) => {
 
 Команды:
 /app - Открыть приложение
+/time - Проверить время
+/notify HH:MM - Быстро настроить уведомление
 /help - Справка
 
 Для начала нажмите на кнопку "Открыть приложение" ⬇️`;
@@ -167,6 +157,67 @@ bot.onText(/\/app/, (msg) => {
   bot.sendMessage(chatId, '🎯 Нажмите на кнопку ниже, чтобы открыть приложение:', options);
 });
 
+// Команда для проверки времени сервера
+bot.onText(/\/time/, (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const now = new Date();
+  const serverTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const utcTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
+  
+  let notificationsList = '';
+  if (notifications.has(userId)) {
+    const userNotification = notifications.get(userId);
+    notificationsList = `Ваше уведомление: ${userNotification.time}`;
+  } else {
+    notificationsList = 'У вас нет уведомлений';
+  }
+  
+  bot.sendMessage(chatId, 
+    `🕐 Время сервера: ${serverTime}\n` +
+    `🌍 UTC время: ${utcTime}\n` +
+    `👥 Всего пользователей: ${users.size}\n` +
+    `🔔 Всего уведомлений: ${notifications.size}\n\n` +
+    `📋 ${notificationsList}`
+  );
+});
+
+// Команда для быстрой настройки уведомлений
+bot.onText(/\/notify (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const time = match[1];
+
+  console.log(`🔔 Команда /notify от пользователя ${userId}, время: ${time}`);
+
+  // Проверяем формат времени
+  if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
+    bot.sendMessage(chatId, '❌ Неправильный формат времени! Используйте HH:MM, например: /notify 19:00');
+    return;
+  }
+
+  // Сохраняем пользователя
+  users.set(userId, {
+    chatId,
+    username: msg.from.username,
+    firstName: msg.from.first_name,
+    active: true,
+    notifications: true,
+    notificationTime: time
+  });
+
+  // Добавляем уведомление
+  notifications.set(userId, {
+    time: time,
+    enabled: true,
+    type: 'daily'
+  });
+
+  saveData();
+
+  bot.sendMessage(chatId, `✅ Уведомления настроены на ${time}!\n\nТеперь каждый день в это время я буду напоминать о занятиях.\n\nПроверить: /time`);
+});
+
 bot.onText(/\/help/, (msg) => {
   const chatId = msg.chat.id;
   
@@ -175,10 +226,13 @@ bot.onText(/\/help/, (msg) => {
 🎯 Основные команды:
 /start - Перезапустить бота
 /app - Открыть приложение
+/time - Показать время сервера
+/notify HH:MM - Настроить уведомление
 /help - Показать эту справку
 
-🔔 Уведомления:
-Бот может напоминать о времени занятий с ребенком. Настройте время и тип уведомлений в приложении.
+🔔 Примеры настройки уведомлений:
+/notify 09:00 - утреннее напоминание
+/notify 19:00 - вечернее напоминание
 
 ❓ Возникли вопросы?
 Напишите разработчику`;
@@ -253,15 +307,11 @@ bot.on('callback_query', (callbackQuery) => {
 });
 
 // API эндпоинты для приложения
-
-// Подключение уведомлений
 app.post('/api/telegram/connect', (req, res) => {
   const { userId, username, settings } = req.body;
 
   console.log('🔗 Запрос на подключение уведомлений:', userId);
   console.log('📊 Данные запроса:', { userId, username, settings });
-  console.log('👤 Пользователь в базе:', users.has(userId));
-  console.log('👥 Всего пользователей в базе:', Array.from(users.keys()));
 
   if (users.has(userId)) {
     console.log('✅ Пользователь найден, обновляем...');
@@ -277,15 +327,13 @@ app.post('/api/telegram/connect', (req, res) => {
     });
 
     saveData();
-    console.log('💾 Данные сохранены, уведомлений:', notifications.size);
 
     res.json({ success: true, message: 'Уведомления подключены' });
   } else {
     console.log('❌ Пользователь не найден! Создаём нового...');
     
-    // ДОБАВЬ: Создаём пользователя, если его нет
     users.set(userId, {
-      chatId: null, // Пока не знаем chatId
+      chatId: null,
       username: username,
       firstName: 'Пользователь',
       active: true,
@@ -300,29 +348,8 @@ app.post('/api/telegram/connect', (req, res) => {
     });
 
     saveData();
-    console.log('💾 Новый пользователь создан, уведомлений:', notifications.size);
     
     res.json({ success: true, message: 'Пользователь создан и уведомления подключены' });
-  }
-});
-
-  if (users.has(userId)) {
-    const user = users.get(userId);
-    user.notifications = true;
-    user.notificationTime = settings.time;
-    users.set(userId, user);
-
-    notifications.set(userId, {
-      time: settings.time,
-      enabled: true,
-      type: settings.reminderType || 'daily'
-    });
-
-    saveData();
-
-    res.json({ success: true, message: 'Уведомления подключены' });
-  } else {
-    res.status(404).json({ success: false, message: 'Пользователь не найден' });
   }
 });
 
@@ -334,120 +361,76 @@ app.post('/api/telegram/send-notification', (req, res) => {
 
   if (users.has(userId)) {
     const user = users.get(userId);
-    bot.sendMessage(user.chatId, `🔔 ${message}`);
-    res.json({ success: true, message: 'Уведомление отправлено' });
+    if (user.chatId) {
+      bot.sendMessage(user.chatId, `🔔 ${message}`);
+      res.json({ success: true, message: 'Уведомление отправлено' });
+    } else {
+      res.status(400).json({ success: false, message: 'ChatId не найден, сначала напишите боту /start' });
+    }
   } else {
     res.status(404).json({ success: false, message: 'Пользователь не найден' });
   }
 });
 
-// Создание инвойса для оплаты
-app.post('/api/telegram/create-invoice', async (req, res) => {
-  const { userId, amount, description, payload } = req.body;
-
-  try {
-    console.log('💳 Создание инвойса для пользователя:', userId);
-    
-    // Пока что симуляция - в реальном проекте здесь будет настоящий платёж
-    res.json({ 
-      success: true, 
-      invoiceUrl: 'https://t.me/invoice/test',
-      message: 'Функция оплаты в разработке' 
-    });
-  } catch (error) {
-    console.error('Ошибка создания инвойса:', error);
-    res.status(500).json({ success: false, message: 'Ошибка создания платежа' });
-  }
-});
-
-// Планировщик уведомлений - проверяем каждую минуту
+// Планировщик уведомлений
 cron.schedule('* * * * *', () => {
   const now = new Date();
   const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   
-  // ===== ДОБАВЛЯЕМ ОТЛАДОЧНЫЕ СООБЩЕНИЯ =====
-  console.log('⏰ Проверка времени:', currentTime, 'UTC время:', now.toISOString());
+  console.log('⏰ Проверка времени:', currentTime);
   console.log('👥 Всего пользователей:', users.size);
   console.log('🔔 Всего уведомлений:', notifications.size);
-  
-  // Показываем все настроенные уведомления
+
   if (notifications.size > 0) {
-    console.log('📋 Список всех уведомлений:');
     notifications.forEach((notification, userId) => {
-      const user = users.get(userId);
-      console.log(`  - Пользователь: ${user?.firstName || userId} (ID: ${userId})`);
-      console.log(`    Время: ${notification.time}, Включено: ${notification.enabled}`);
+      console.log(`🔍 Пользователь ${userId}: время ${notification.time}, включено ${notification.enabled}`);
+      
+      if (notification.enabled && notification.time === currentTime) {
+        if (users.has(userId)) {
+          const user = users.get(userId);
+          console.log(`📬 ОТПРАВЛЯЕМ уведомление пользователю: ${user.firstName} (${userId})`);
+          
+          const messages = [
+            '🌟 Время для развития! Готовы к новым открытиям?',
+            '🎯 Пора заниматься! Каждый день - это прогресс!',
+            '💫 Время интересных активностей с малышом!',
+            '🚀 Готовы развиваться? Выберите активность в приложении!'
+          ];
+
+          const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+
+          const options = {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '🚀 Открыть приложение',
+                    web_app: { url: APP_URL }
+                  }
+                ]
+              ]
+            }
+          };
+
+          if (user.chatId) {
+            bot.sendMessage(user.chatId, `🔔 ${randomMessage}`, options)
+              .then(() => {
+                console.log('✅ Уведомление отправлено успешно');
+              })
+              .catch((error) => {
+                console.error('❌ Ошибка отправки уведомления:', error.message);
+              });
+          } else {
+            console.log('❌ ChatId не найден для пользователя:', userId);
+          }
+        } else {
+          console.log(`❌ Пользователь ${userId} не найден в базе users`);
+        }
+      }
     });
   } else {
     console.log('📭 Нет настроенных уведомлений');
   }
-  // ===== КОНЕЦ ОТЛАДКИ =====
-
-  // Оригинальный код проверки уведомлений
-  notifications.forEach((notification, userId) => {
-    console.log(`🔍 Проверяем: ${notification.time} === ${currentTime}? ${notification.time === currentTime}`);
-    
-    if (notification.enabled && notification.time === currentTime) {
-      if (users.has(userId)) {
-        const user = users.get(userId);
-        console.log(`📬 ОТПРАВЛЯЕМ уведомление пользователю: ${user.firstName} (${userId})`);
-        
-        const messages = [
-          '🌟 Время для развития! Готовы к новым открытиям?',
-          '🎯 Пора заниматься! Каждый день - это прогресс!',
-          '💫 Время интересных активностей с малышом!',
-          '🚀 Готовы развиваться? Выберите активность в приложении!'
-        ];
-
-        const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-
-        const options = {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: '🚀 Открыть приложение',
-                  web_app: { url: APP_URL }
-                }
-              ]
-            ]
-          }
-        };
-
-        bot.sendMessage(user.chatId, `🔔 ${randomMessage}`, options)
-          .then(() => {
-            console.log('✅ Уведомление отправлено успешно');
-          })
-          .catch((error) => {
-            console.error('❌ Ошибка отправки уведомления:', error.message);
-          });
-      } else {
-        console.log(`❌ Пользователь ${userId} не найден в базе users`);
-      }
-    }
-  });
-});
-
-// Команда для проверки времени сервера
-bot.onText(/\/time/, (msg) => {
-  const chatId = msg.chat.id;
-  const now = new Date();
-  const utcTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
-  const serverTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  
-  let notificationsList = '';
-  notifications.forEach((notification, userId) => {
-    const user = users.get(userId);
-    notificationsList += `${user?.firstName || userId}: ${notification.time}\n`;
-  });
-  
-  bot.sendMessage(chatId, 
-    `🕐 Время сервера: ${serverTime}\n` +
-    `🌍 UTC время: ${utcTime}\n` +
-    `👥 Пользователей: ${users.size}\n` +
-    `🔔 Уведомлений: ${notifications.size}\n\n` +
-    `📋 Настроенные уведомления:\n${notificationsList || 'Нет уведомлений'}`
-  );
 });
 
 // Обработка ошибок бота
@@ -466,16 +449,8 @@ app.get('/', (req, res) => {
     message: 'Telegram Bot API для Развивайка работает!',
     users: users.size,
     notifications: notifications.size,
-    uptime: process.uptime()
-  });
-});
-
-app.get('/status', (req, res) => {
-  res.json({
-    bot: 'online',
-    users: users.size,
-    notifications: notifications.size,
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    timezone: process.env.TZ
   });
 });
 
