@@ -236,6 +236,8 @@ bot.on('callback_query', (callbackQuery) => {
       type: 'daily'
     });
 
+    saveData();
+
     bot.editMessageText(
       `✅ Уведомления настроены на ${time}!\n\nТеперь я буду напоминать о занятиях каждый день в это время.`,
       {
@@ -269,6 +271,8 @@ app.post('/api/telegram/connect', (req, res) => {
       enabled: true,
       type: settings.reminderType || 'daily'
     });
+
+    saveData();
 
     res.json({ success: true, message: 'Уведомления подключены' });
   } else {
