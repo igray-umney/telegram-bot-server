@@ -15,9 +15,44 @@ console.log('📦 TelegramBot загружен');
 const cron = require('node-cron');
 console.log('📦 node-cron загружен');
 
+const fs = require('fs');
+
+console.log('🔄 Запуск сервера...');
 // Устанавливаем часовой пояс Москвы
 process.env.TZ = 'Europe/Moscow';
-console.log('🌍 Часовой пояс установлен:', process.env.TZ);
+
+// ДОБАВЬ ЭТИ ФУНКЦИИ:
+// Функция сохранения данных в файл
+function saveData() {
+  const data = {
+    users: Array.from(users.entries()),
+    notifications: Array.from(notifications.entries()),
+    timestamp: new Date().toISOString()
+  };
+  
+  try {
+    fs.writeFileSync('data.json', JSON.stringify(data, null, 2));
+    console.log('💾 Данные сохранены:', users.size, 'пользователей,', notifications.size, 'уведомлений');
+  } catch (error) {
+    console.error('❌ Ошибка сохранения:', error.message);
+  }
+}
+
+// Функция загрузки данных из файла
+function loadData() {
+  try {
+    if (fs.existsSync('data.json')) {
+      const data = JSON.parse(fs.readFileSync('data.json', 'utf8'));
+      users = new Map(data.users || []);
+      notifications = new Map(data.notifications || []);
+      console.log('📂 Данные загружены:', users.size, 'пользователей,', notifications.size, 'уведомлений');
+    } else {
+      console.log('📂 Файл данных не найден, начинаем с пустой базы');
+    }
+  } catch (error) {
+    console.error('❌ Ошибка загрузки:', error.message);
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
