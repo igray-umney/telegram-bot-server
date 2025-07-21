@@ -259,6 +259,52 @@ app.post('/api/telegram/connect', (req, res) => {
   const { userId, username, settings } = req.body;
 
   console.log('🔗 Запрос на подключение уведомлений:', userId);
+  console.log('📊 Данные запроса:', { userId, username, settings });
+  console.log('👤 Пользователь в базе:', users.has(userId));
+  console.log('👥 Всего пользователей в базе:', Array.from(users.keys()));
+
+  if (users.has(userId)) {
+    console.log('✅ Пользователь найден, обновляем...');
+    const user = users.get(userId);
+    user.notifications = true;
+    user.notificationTime = settings.time;
+    users.set(userId, user);
+
+    notifications.set(userId, {
+      time: settings.time,
+      enabled: true,
+      type: settings.reminderType || 'daily'
+    });
+
+    saveData();
+    console.log('💾 Данные сохранены, уведомлений:', notifications.size);
+
+    res.json({ success: true, message: 'Уведомления подключены' });
+  } else {
+    console.log('❌ Пользователь не найден! Создаём нового...');
+    
+    // ДОБАВЬ: Создаём пользователя, если его нет
+    users.set(userId, {
+      chatId: null, // Пока не знаем chatId
+      username: username,
+      firstName: 'Пользователь',
+      active: true,
+      notifications: true,
+      notificationTime: settings.time
+    });
+
+    notifications.set(userId, {
+      time: settings.time,
+      enabled: true,
+      type: settings.reminderType || 'daily'
+    });
+
+    saveData();
+    console.log('💾 Новый пользователь создан, уведомлений:', notifications.size);
+    
+    res.json({ success: true, message: 'Пользователь создан и уведомления подключены' });
+  }
+});
 
   if (users.has(userId)) {
     const user = users.get(userId);
