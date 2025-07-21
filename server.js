@@ -15,6 +15,10 @@ console.log('📦 TelegramBot загружен');
 const cron = require('node-cron');
 console.log('📦 node-cron загружен');
 
+// Устанавливаем часовой пояс Москвы
+process.env.TZ = 'Europe/Moscow';
+console.log('🌍 Часовой пояс установлен:', process.env.TZ);
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 console.log('🔧 Express app создан, порт:', PORT);
