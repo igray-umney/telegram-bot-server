@@ -266,54 +266,89 @@ cron.schedule('* * * * *', () => {
   const now = new Date();
   const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   
-  console.log('⏰ Проверка времени:', currentTime, 'Активных уведомлений:', notifications.size);
-
+  // ===== ДОБАВЛЯЕМ ОТЛАДОЧНЫЕ СООБЩЕНИЯ =====
+  console.log('⏰ Проверка времени:', currentTime, 'UTC время:', now.toISOString());
+  console.log('👥 Всего пользователей:', users.size);
+  console.log('🔔 Всего уведомлений:', notifications.size);
+  
+  // Показываем все настроенные уведомления
   if (notifications.size > 0) {
+    console.log('📋 Список всех уведомлений:');
     notifications.forEach((notification, userId) => {
-      console.log(`🔍 Пользователь ${userId}: время ${notification.time}, включено ${notification.enabled}`);
-      
-      if (notification.enabled && notification.time === currentTime) {
-        if (users.has(userId)) {
-          const user = users.get(userId);
-          console.log(`📬 Отправляем уведомление пользователю: ${user.firstName} (${userId})`);
-          
-          const messages = [
-            '🌟 Время для развития! Готовы к новым открытиям?',
-            '🎯 Пора заниматься! Каждый день - это прогресс!',
-            '💫 Время интересных активностей с малышом!',
-            '🚀 Готовы развиваться? Выберите активность в приложении!'
-          ];
-
-          const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-
-          const options = {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: '🚀 Открыть приложение',
-                    web_app: { url: APP_URL }
-                  }
-                ]
-              ]
-            }
-          };
-
-          bot.sendMessage(user.chatId, `🔔 ${randomMessage}`, options)
-            .then(() => {
-              console.log('✅ Уведомление отправлено успешно');
-            })
-            .catch((error) => {
-              console.error('❌ Ошибка отправки уведомления:', error.message);
-            });
-        } else {
-          console.log(`❌ Пользователь ${userId} не найден в базе`);
-        }
-      }
+      const user = users.get(userId);
+      console.log(`  - Пользователь: ${user?.firstName || userId} (ID: ${userId})`);
+      console.log(`    Время: ${notification.time}, Включено: ${notification.enabled}`);
     });
   } else {
-    console.log('📭 Нет активных уведомлений');
+    console.log('📭 Нет настроенных уведомлений');
   }
+  // ===== КОНЕЦ ОТЛАДКИ =====
+
+  // Оригинальный код проверки уведомлений
+  notifications.forEach((notification, userId) => {
+    console.log(`🔍 Проверяем: ${notification.time} === ${currentTime}? ${notification.time === currentTime}`);
+    
+    if (notification.enabled && notification.time === currentTime) {
+      if (users.has(userId)) {
+        const user = users.get(userId);
+        console.log(`📬 ОТПРАВЛЯЕМ уведомление пользователю: ${user.firstName} (${userId})`);
+        
+        const messages = [
+          '🌟 Время для развития! Готовы к новым открытиям?',
+          '🎯 Пора заниматься! Каждый день - это прогресс!',
+          '💫 Время интересных активностей с малышом!',
+          '🚀 Готовы развиваться? Выберите активность в приложении!'
+        ];
+
+        const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+
+        const options = {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '🚀 Открыть приложение',
+                  web_app: { url: APP_URL }
+                }
+              ]
+            ]
+          }
+        };
+
+        bot.sendMessage(user.chatId, `🔔 ${randomMessage}`, options)
+          .then(() => {
+            console.log('✅ Уведомление отправлено успешно');
+          })
+          .catch((error) => {
+            console.error('❌ Ошибка отправки уведомления:', error.message);
+          });
+      } else {
+        console.log(`❌ Пользователь ${userId} не найден в базе users`);
+      }
+    }
+  });
+});
+
+// Команда для проверки времени сервера
+bot.onText(/\/time/, (msg) => {
+  const chatId = msg.chat.id;
+  const now = new Date();
+  const utcTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
+  const serverTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  
+  let notificationsList = '';
+  notifications.forEach((notification, userId) => {
+    const user = users.get(userId);
+    notificationsList += `${user?.firstName || userId}: ${notification.time}\n`;
+  });
+  
+  bot.sendMessage(chatId, 
+    `🕐 Время сервера: ${serverTime}\n` +
+    `🌍 UTC время: ${utcTime}\n` +
+    `👥 Пользователей: ${users.size}\n` +
+    `🔔 Уведомлений: ${notifications.size}\n\n` +
+    `📋 Настроенные уведомления:\n${notificationsList || 'Нет уведомлений'}`
+  );
 });
 
 // Обработка ошибок бота
