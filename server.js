@@ -311,45 +311,61 @@ app.post('/api/telegram/connect', (req, res) => {
   const { userId, username, settings } = req.body;
 
   console.log('🔗 Запрос на подключение уведомлений:', userId);
-  console.log('📊 Данные запроса:', { userId, username, settings });
+  console.log('📊 Полные данные запроса:', JSON.stringify({ userId, username, settings }, null, 2));
+  console.log('👥 Пользователи в базе:', Array.from(users.keys()));
+  console.log('🔔 Уведомления в базе:', Array.from(notifications.keys()));
 
-  if (users.has(userId)) {
-    console.log('✅ Пользователь найден, обновляем...');
-    const user = users.get(userId);
+  // Проверяем тип userId
+  const userIdNumber = parseInt(userId);
+  console.log('🔢 userId как число:', userIdNumber);
+  
+  let foundUser = users.has(userId) || users.has(userIdNumber);
+  console.log('👤 Пользователь найден:', foundUser);
+
+  if (foundUser) {
+    console.log('✅ Обновляем существующего пользователя');
+    
+    const user = users.get(userId) || users.get(userIdNumber);
     user.notifications = true;
     user.notificationTime = settings.time;
-    users.set(userId, user);
+    users.set(userIdNumber, user); // Сохраняем как число
 
-    notifications.set(userId, {
+    notifications.set(userIdNumber, {
       time: settings.time,
       enabled: true,
       type: settings.reminderType || 'daily'
     });
 
     saveData();
+    console.log('💾 Данные сохранены для существующего пользователя');
 
     res.json({ success: true, message: 'Уведомления подключены' });
   } else {
     console.log('❌ Пользователь не найден! Создаём нового...');
     
-    users.set(userId, {
-      chatId: null,
+    // Создаём нового пользователя
+    users.set(userIdNumber, {
+      chatId: null, // Будет установлен когда пользователь напишет боту
       username: username,
-      firstName: 'Пользователь',
+      firstName: 'Пользователь из приложения',
       active: true,
       notifications: true,
       notificationTime: settings.time
     });
 
-    notifications.set(userId, {
+    notifications.set(userIdNumber, {
       time: settings.time,
       enabled: true,
       type: settings.reminderType || 'daily'
     });
 
     saveData();
+    console.log('💾 Создан новый пользователь');
     
-    res.json({ success: true, message: 'Пользователь создан и уведомления подключены' });
+    res.json({ 
+      success: true, 
+      message: 'Пользователь создан и уведомления подключены. Напишите боту /start для активации.' 
+    });
   }
 });
 
