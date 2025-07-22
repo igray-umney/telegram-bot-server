@@ -311,16 +311,9 @@ app.post('/api/telegram/connect', (req, res) => {
   const { userId, username, settings } = req.body;
 
   console.log('🔗 Запрос на подключение уведомлений:', userId);
-  console.log('📊 Полные данные запроса:', JSON.stringify({ userId, username, settings }, null, 2));
-  console.log('👥 Пользователи в базе:', Array.from(users.keys()));
-  console.log('🔔 Уведомления в базе:', Array.from(notifications.keys()));
-
-  // Проверяем тип userId
-  const userIdNumber = parseInt(userId);
-  console.log('🔢 userId как число:', userIdNumber);
   
+  const userIdNumber = parseInt(userId);
   let foundUser = users.has(userId) || users.has(userIdNumber);
-  console.log('👤 Пользователь найден:', foundUser);
 
   if (foundUser) {
     console.log('✅ Обновляем существующего пользователя');
@@ -328,7 +321,7 @@ app.post('/api/telegram/connect', (req, res) => {
     const user = users.get(userId) || users.get(userIdNumber);
     user.notifications = true;
     user.notificationTime = settings.time;
-    users.set(userIdNumber, user); // Сохраняем как число
+    users.set(userIdNumber, user);
 
     notifications.set(userIdNumber, {
       time: settings.time,
@@ -337,15 +330,17 @@ app.post('/api/telegram/connect', (req, res) => {
     });
 
     saveData();
-    console.log('💾 Данные сохранены для существующего пользователя');
 
-    res.json({ success: true, message: 'Уведомления подключены' });
+    res.json({ 
+      success: true, 
+      message: 'Уведомления подключены',
+      needsBotStart: !user.chatId // Показываем, нужно ли писать боту
+    });
   } else {
     console.log('❌ Пользователь не найден! Создаём нового...');
     
-    // Создаём нового пользователя
     users.set(userIdNumber, {
-      chatId: null, // Будет установлен когда пользователь напишет боту
+      chatId: null,
       username: username,
       firstName: 'Пользователь из приложения',
       active: true,
@@ -360,11 +355,11 @@ app.post('/api/telegram/connect', (req, res) => {
     });
 
     saveData();
-    console.log('💾 Создан новый пользователь');
     
     res.json({ 
       success: true, 
-      message: 'Пользователь создан и уведомления подключены. Напишите боту /start для активации.' 
+      message: 'Уведомления настроены! Напишите боту /start для активации.',
+      needsBotStart: true
     });
   }
 });
