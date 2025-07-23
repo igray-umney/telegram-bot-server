@@ -145,13 +145,13 @@ app.post('/api/telegram/connect', (req, res) => {
       res.json({ 
         success: true, 
         message: 'Уже подключен',
-        botUsername: 'razvivayка_bot' // Замените на имя вашего бота
+        botUsername: 'umney_kids_bot' // Замените на имя вашего бота
       });
     } else {
       res.json({ 
         success: false, 
         message: 'Сначала напишите боту /start',
-        botUsername: 'razvivayка_bot' // Замените на имя вашего бота
+        botUsername: 'umney_kids_bot' // Замените на имя вашего бота
       });
     }
     
