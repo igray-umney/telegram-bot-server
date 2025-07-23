@@ -301,6 +301,32 @@ bot.onText(/\/status/, async (msg) => {
   showStatus(chatId, userId);
 });
 
+bot.onText(/\/app/, async (msg) => {
+  const chatId = msg.chat.id;
+  
+  // Удаляем команду пользователя
+  try {
+    await bot.deleteMessage(chatId, msg.message_id);
+  } catch (error) {
+    // Игнорируем
+  }
+  
+  const message = `🚀 **Открыть Развивайка**
+
+Нажмите кнопку ниже чтобы открыть приложение:`;
+
+  const keyboard = {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🚀 Открыть приложение', web_app: { url: 'https://your-app-url.com' } }],
+        [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+      ]
+    }
+  };
+
+  bot.sendMessage(chatId, message, { parse_mode: 'Markdown', ...keyboard });
+});
+
 // Функции меню
 async function showMainMenu(chatId, userId) {
   const welcomeMessage = `🌟 **Развивайка - Главное меню**
