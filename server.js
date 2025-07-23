@@ -1,7 +1,112 @@
-// Добавьте эту переменную в начало файла (после инициализации бота)
-const userMenuMessages = new Map(); // Хранит ID сообщений меню для каждого пользователя
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const TelegramBot = require('node-telegram-bot-api');
+const fs = require('fs');
+const path = require('path');
+const cron = require('node-cron');
 
-// Функция для удаления старого меню и отправки нового
+const app = express();
+const PORT = process.env.PORT || 3000;
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+// Инициализация бота
+let bot;
+try {
+  bot = new TelegramBot(TOKEN, { 
+    polling: {
+      interval: 1000,
+      autoStart: true,
+      params: { timeout: 10 }
+    }
+  });
+  console.log('🤖 Бот инициализирован');
+} catch (error) {
+  console.error('❌ Ошибка инициализации бота:', error);
+  process.exit(1);
+}
+
+// Обработка ошибок бота
+bot.on('error', (error) => console.error('❌ Ошибка бота:', error));
+bot.on('polling_error', (error) => console.error('❌ Ошибка polling:', error));
+
+// Хранилище ID сообщений меню для каждого пользователя
+const userMenuMessages = new Map();
+
+// Файл для хранения данных
+const dataFile = path.join(__dirname, 'users.json');
+
+// Инициализация файла данных
+if (!fs.existsSync(dataFile)) {
+  const initialData = { users: [], notifications: [] };
+  fs.writeFileSync(dataFile, JSON.stringify(initialData, null, 2));
+  console.log('📄 Создан файл данных');
+}
+
+// Функции для работы с данными
+function loadData() {
+  try {
+    const data = fs.readFileSync(dataFile, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('❌ Ошибка загрузки данных:', error);
+    return { users: [], notifications: [] };
+  }
+}
+
+function saveData(data) {
+  try {
+    fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
+    return true;
+  } catch (error) {
+    console.error('❌ Ошибка сохранения данных:', error);
+    return false;
+  }
+}
+
+// Временные зоны
+const timezones = {
+  'Москва': 3,
+  'Санкт-Петербург': 3,
+  'Екатеринбург': 5,
+  'Новосибирск': 7,
+  'Красноярск': 7,
+  'Иркутск': 8,
+  'Владивосток': 10,
+  'Калининград': 2,
+  'Самара': 4,
+  'Омск': 6,
+  'Челябинск': 5,
+  'Казань': 3,
+  'Нижний Новгород': 3,
+  'Ростов-на-Дону': 3,
+  'Уфа': 5,
+  'Пермь': 5
+};
+
+// Время для выбора
+const timeSlots = [
+  '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+  '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
+  '20:00'
+];
+
+// Типы сообщений
+const messageTypes = {
+  'motivational': 'Мотивирующие 🌟',
+  'simple': 'Простые ⏰',
+  'streak': 'С достижениями 🏆',
+  'playful': 'Игривые 🎮'
+};
+
+// Функция для отправки меню с автоудалением предыдущего
 async function sendMenuMessage(chatId, text, keyboard, userId = null) {
   try {
     // Удаляем предыдущее меню если есть
@@ -9,12 +114,12 @@ async function sendMenuMessage(chatId, text, keyboard, userId = null) {
       try {
         await bot.deleteMessage(chatId, userMenuMessages.get(userId));
       } catch (error) {
-        // Сообщение уже удалено или недоступно - игнорируем
+        // Сообщение уже удалено - игнорируем
       }
     }
     
     // Отправляем новое сообщение
-    const sentMessage = await bot.sendMessage(chatId, text, keyboard);
+    const sentMessage = await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', ...keyboard });
     
     // Сохраняем ID нового сообщения
     if (userId) {
@@ -38,12 +143,69 @@ async function editMenuMessage(chatId, messageId, text, keyboard) {
     });
   } catch (error) {
     // Если не удалось отредактировать, отправляем новое
-    console.log('Не удалось отредактировать, отправляем новое сообщение');
     return await bot.sendMessage(chatId, text, { parse_mode: 'Markdown', ...keyboard });
   }
 }
 
-// Обновленная функция /start
+// API Endpoints
+app.get('/api/telegram/status/:userId', (req, res) => {
+  const userId = req.params.userId;
+  
+  try {
+    const data = loadData();
+    const user = data.users.find(u => u.userId === userId);
+    
+    if (user && user.hasStarted) {
+      res.json({
+        connected: true,
+        enabled: user.enabled,
+        time: user.time,
+        timezone: user.timezone || 'Москва',
+        type: user.reminderType || 'motivational'
+      });
+    } else {
+      res.json({
+        connected: false,
+        enabled: false,
+        time: '19:00',
+        timezone: 'Москва',
+        type: 'motivational'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Ошибка при получении статуса:', error);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
+app.post('/api/telegram/connect', (req, res) => {
+  const { userId } = req.body;
+  
+  try {
+    const data = loadData();
+    let user = data.users.find(u => u.userId === userId);
+    
+    if (user && user.hasStarted) {
+      res.json({ 
+        success: true, 
+        message: 'Уже подключен',
+        botUsername: 'razvivayка_bot'
+      });
+    } else {
+      res.json({ 
+        success: false, 
+        message: 'Сначала напишите боту /start',
+        botUsername: 'razvivayка_bot'
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Ошибка подключения:', error);
+    res.status(500).json({ success: false, message: 'Ошибка сервера' });
+  }
+});
+
+// Обработчики бота
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id.toString();
@@ -106,7 +268,6 @@ bot.onText(/\/start/, async (msg) => {
   }
 });
 
-// Обновленная функция настроек
 bot.onText(/\/settings/, async (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id.toString();
@@ -135,7 +296,33 @@ bot.onText(/\/status/, async (msg) => {
   showStatus(chatId, userId);
 });
 
-// Обновленная функция показа меню настроек
+// Функции меню
+async function showMainMenu(chatId, userId) {
+  const welcomeMessage = `🌟 **Развивайка - Главное меню**
+
+Выберите действие:`;
+
+  const keyboard = {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '⚙️ Настройки уведомлений', callback_data: 'settings' }],
+        [{ text: '📊 Мой статус', callback_data: 'status' }],
+        [{ text: '❓ Помощь', callback_data: 'help' }]
+      ]
+    }
+  };
+
+  if (userMenuMessages.has(userId)) {
+    try {
+      await editMenuMessage(chatId, userMenuMessages.get(userId), welcomeMessage, keyboard);
+    } catch (error) {
+      await sendMenuMessage(chatId, welcomeMessage, keyboard, userId);
+    }
+  } else {
+    await sendMenuMessage(chatId, welcomeMessage, keyboard, userId);
+  }
+}
+
 async function showSettingsMenu(chatId, userId) {
   const data = loadData();
   const user = data.users.find(u => u.userId === userId);
@@ -165,7 +352,6 @@ ${user.enabled ? '🟢' : '🔴'} Уведомления: ${user.enabled ? 'Вк
 🌍 Часовой пояс: ${user.timezone} (UTC+${timezones[user.timezone]})
 💬 Тип сообщений: ${messageTypes[user.reminderType]}`;
 
-  // Если есть сохраненное сообщение меню, редактируем его
   if (userMenuMessages.has(userId)) {
     try {
       await editMenuMessage(chatId, userMenuMessages.get(userId), message, keyboard);
@@ -177,7 +363,6 @@ ${user.enabled ? '🟢' : '🔴'} Уведомления: ${user.enabled ? 'Вк
   }
 }
 
-// Обновленная функция показа статуса
 async function showStatus(chatId, userId) {
   const data = loadData();
   const user = data.users.find(u => u.userId === userId);
@@ -219,7 +404,48 @@ ${status}
   }
 }
 
-// Обновленная обработка callback кнопок
+async function showHelp(chatId, userId) {
+  const helpMessage = `❓ **Справка**
+
+**Команды:**
+/start - Запуск бота
+/settings - Настройки уведомлений  
+/status - Текущий статус
+
+**Возможности:**
+🔔 Настройка времени уведомлений
+🌍 Выбор часового пояса
+💬 Разные типы сообщений
+📱 Тестирование уведомлений
+
+**Типы уведомлений:**
+🌟 Мотивирующие - вдохновляющие сообщения
+⏰ Простые - краткие напоминания
+🏆 С достижениями - акцент на прогрессе
+🎮 Игривые - веселые сообщения
+
+Удачного развития! 🚀`;
+
+  const keyboard = {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+      ]
+    }
+  };
+
+  if (userMenuMessages.has(userId)) {
+    try {
+      await editMenuMessage(chatId, userMenuMessages.get(userId), helpMessage, keyboard);
+    } catch (error) {
+      await sendMenuMessage(chatId, helpMessage, keyboard, userId);
+    }
+  } else {
+    await sendMenuMessage(chatId, helpMessage, keyboard, userId);
+  }
+}
+
+// Обработка callback кнопок
 bot.on('callback_query', async (callbackQuery) => {
   const message = callbackQuery.message;
   const userId = callbackQuery.from.id.toString();
@@ -264,76 +490,7 @@ bot.on('callback_query', async (callbackQuery) => {
   }
 });
 
-// Новая функция главного меню
-async function showMainMenu(chatId, userId) {
-  const welcomeMessage = `🌟 **Развивайка - Главное меню**
-
-Выберите действие:`;
-
-  const keyboard = {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: '⚙️ Настройки уведомлений', callback_data: 'settings' }],
-        [{ text: '📊 Мой статус', callback_data: 'status' }],
-        [{ text: '❓ Помощь', callback_data: 'help' }]
-      ]
-    }
-  };
-
-  if (userMenuMessages.has(userId)) {
-    try {
-      await editMenuMessage(chatId, userMenuMessages.get(userId), welcomeMessage, keyboard);
-    } catch (error) {
-      await sendMenuMessage(chatId, welcomeMessage, keyboard, userId);
-    }
-  } else {
-    await sendMenuMessage(chatId, welcomeMessage, keyboard, userId);
-  }
-}
-
-// Функция помощи
-async function showHelp(chatId, userId) {
-  const helpMessage = `❓ **Справка**
-
-**Команды:**
-/start - Запуск бота
-/settings - Настройки уведомлений  
-/status - Текущий статус
-
-**Возможности:**
-🔔 Настройка времени уведомлений
-🌍 Выбор часового пояса
-💬 Разные типы сообщений
-📱 Тестирование уведомлений
-
-**Типы уведомлений:**
-🌟 Мотивирующие - вдохновляющие сообщения
-⏰ Простые - краткие напоминания
-🏆 С достижениями - акцент на прогрессе
-🎮 Игривые - веселые сообщения
-
-Удачного развития! 🚀`;
-
-  const keyboard = {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
-      ]
-    }
-  };
-
-  if (userMenuMessages.has(userId)) {
-    try {
-      await editMenuMessage(chatId, userMenuMessages.get(userId), helpMessage, keyboard);
-    } catch (error) {
-      await sendMenuMessage(chatId, helpMessage, keyboard, userId);
-    }
-  } else {
-    await sendMenuMessage(chatId, helpMessage, keyboard, userId);
-  }
-}
-
-// Обновленные функции с автоудалением уведомлений
+// Функции обработки действий
 async function toggleNotifications(chatId, userId) {
   const data = loadData();
   const user = data.users.find(u => u.userId === userId);
@@ -359,6 +516,88 @@ async function toggleNotifications(chatId, userId) {
     
     // Обновляем меню настроек
     setTimeout(() => showSettingsMenu(chatId, userId), 500);
+  }
+}
+
+async function showTimeMenu(chatId, userId) {
+  const timeButtons = [];
+  
+  // Группируем по 3 кнопки в ряд для компактности
+  for (let i = 0; i < timeSlots.length; i += 3) {
+    const row = timeSlots.slice(i, i + 3).map(time => ({
+      text: time,
+      callback_data: `time_${time}`
+    }));
+    timeButtons.push(row);
+  }
+  
+  timeButtons.push([{ text: '◀️ Назад к настройкам', callback_data: 'back_to_settings' }]);
+
+  const keyboard = { reply_markup: { inline_keyboard: timeButtons } };
+  
+  const message = '⏰ **Выберите время для уведомлений:**';
+  
+  if (userMenuMessages.has(userId)) {
+    try {
+      await editMenuMessage(chatId, userMenuMessages.get(userId), message, keyboard);
+    } catch (error) {
+      await sendMenuMessage(chatId, message, keyboard, userId);
+    }
+  } else {
+    await sendMenuMessage(chatId, message, keyboard, userId);
+  }
+}
+
+async function showTimezoneMenu(chatId, userId) {
+  const tzButtons = [];
+  
+  // Группируем города по 2 в ряд
+  const cities = Object.keys(timezones);
+  for (let i = 0; i < cities.length; i += 2) {
+    const row = cities.slice(i, i + 2).map(tz => ({
+      text: `${tz}`,
+      callback_data: `tz_${tz.replace(/ /g, '_')}`
+    }));
+    tzButtons.push(row);
+  }
+  
+  tzButtons.push([{ text: '◀️ Назад к настройкам', callback_data: 'back_to_settings' }]);
+
+  const keyboard = { reply_markup: { inline_keyboard: tzButtons } };
+  
+  const message = '🌍 **Выберите ваш город:**';
+  
+  if (userMenuMessages.has(userId)) {
+    try {
+      await editMenuMessage(chatId, userMenuMessages.get(userId), message, keyboard);
+    } catch (error) {
+      await sendMenuMessage(chatId, message, keyboard, userId);
+    }
+  } else {
+    await sendMenuMessage(chatId, message, keyboard, userId);
+  }
+}
+
+async function showTypeMenu(chatId, userId) {
+  const typeButtons = Object.entries(messageTypes).map(([key, value]) => [{
+    text: value,
+    callback_data: `type_${key}`
+  }]);
+  
+  typeButtons.push([{ text: '◀️ Назад к настройкам', callback_data: 'back_to_settings' }]);
+
+  const keyboard = { reply_markup: { inline_keyboard: typeButtons } };
+  
+  const message = '💬 **Выберите тип уведомлений:**';
+  
+  if (userMenuMessages.has(userId)) {
+    try {
+      await editMenuMessage(chatId, userMenuMessages.get(userId), message, keyboard);
+    } catch (error) {
+      await sendMenuMessage(chatId, message, keyboard, userId);
+    }
+  } else {
+    await sendMenuMessage(chatId, message, keyboard, userId);
   }
 }
 
@@ -445,85 +684,132 @@ async function sendTestNotification(chatId, userId) {
   }
 }
 
-// Обновленные функции меню времени и часовых поясов
-async function showTimeMenu(chatId, userId) {
-  const timeButtons = [];
+// Сообщения по типам
+function getMessagesForType(type) {
+  const messages = {
+    motivational: [
+      '🌟 Время для развития! Готовы к новым открытиям?',
+      '💫 Пора заниматься! Каждый день - новое достижение!',
+      '🎯 Время развиваться! Ваш малыш ждет интересную активность!',
+      '🚀 Развиваемся вместе! Сегодня изучаем что-то новое?'
+    ],
+    simple: [
+      '⏰ Время для занятий с ребенком',
+      '🎯 Напоминание о развивающих активностях',
+      '📚 Пора заниматься!',
+      '⭐ Время развития!'
+    ],
+    streak: [
+      '🔥 Продолжаем серию! Сегодня занимаемся?',
+      '🏆 Каждый день - новое достижение!',
+      '👑 Вы на правильном пути! Продолжаем?',
+      '⭐ Развиваемся каждый день!'
+    ],
+    playful: [
+      '🎮 Время для игр и развития!',
+      '🎪 А что, если сегодня устроим веселые занятия?',
+      '🎯 Играем и развиваемся!',
+      '🎨 Творим и учимся вместе!'
+    ]
+  };
   
-  // Группируем по 3 кнопки в ряд для компактности
-  for (let i = 0; i < timeSlots.length; i += 3) {
-    const row = timeSlots.slice(i, i + 3).map(time => ({
-      text: time,
-      callback_data: `time_${time}`
-    }));
-    timeButtons.push(row);
-  }
-  
-  timeButtons.push([{ text: '◀️ Назад к настройкам', callback_data: 'back_to_settings' }]);
-
-  const keyboard = { reply_markup: { inline_keyboard: timeButtons } };
-  
-  const message = '⏰ **Выберите время для уведомлений:**';
-  
-  if (userMenuMessages.has(userId)) {
-    try {
-      await editMenuMessage(chatId, userMenuMessages.get(userId), message, keyboard);
-    } catch (error) {
-      await sendMenuMessage(chatId, message, keyboard, userId);
-    }
-  } else {
-    await sendMenuMessage(chatId, message, keyboard, userId);
-  }
+  return messages[type] || messages.motivational;
 }
 
-async function showTimezoneMenu(chatId, userId) {
-  const tzButtons = [];
-  
-  // Группируем города по 2 в ряд
-  const cities = Object.keys(timezones);
-  for (let i = 0; i < cities.length; i += 2) {
-    const row = cities.slice(i, i + 2).map(tz => ({
-      text: `${tz}`,
-      callback_data: `tz_${tz.replace(/ /g, '_')}`
-    }));
-    tzButtons.push(row);
+// Cron для отправки уведомлений
+cron.schedule('* * * * *', () => {
+  try {
+    const data = loadData();
+    const now = new Date();
+    
+    data.users.forEach(user => {
+      if (user.enabled && user.hasStarted) {
+        // Рассчитываем время в часовом поясе пользователя
+        const userTimezone = timezones[user.timezone] || 3;
+        const userTime = new Date(now.getTime() + (userTimezone * 60 * 60 * 1000));
+        const currentTime = userTime.toTimeString().slice(0, 5);
+        
+        if (user.time === currentTime) {
+          const messages = getMessagesForType(user.reminderType);
+          const message = messages[Math.floor(Math.random() * messages.length)];
+          
+          bot.sendMessage(user.userId, message)
+            .then(() => {
+              console.log(`✅ Уведомление отправлено пользователю ${user.userId}`);
+            })
+            .catch((error) => {
+              console.error(`❌ Ошибка отправки пользователю ${user.userId}:`, error);
+            });
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Ошибка в cron задаче:', error);
   }
-  
-  tzButtons.push([{ text: '◀️ Назад к настройкам', callback_data: 'back_to_settings' }]);
+});
 
-  const keyboard = { reply_markup: { inline_keyboard: tzButtons } };
+// Базовый маршрут
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Telegram Bot Server работает!', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// Запуск сервера
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Сервер запущен на порту ${PORT}`);
+});
+
+// Настройка keep-alive
+server.keepAliveTimeout = 120000;
+server.headersTimeout = 120000;
+
+// Обработка сигналов завершения
+let isShuttingDown = false;
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
   
-  const message = '🌍 **Выберите ваш город:**';
+  console.log(`📤 Получен сигнал ${signal}, завершаем работу...`);
   
-  if (userMenuMessages.has(userId)) {
-    try {
-      await editMenuMessage(chatId, userMenuMessages.get(userId), message, keyboard);
-    } catch (error) {
-      await sendMenuMessage(chatId, message, keyboard, userId);
-    }
-  } else {
-    await sendMenuMessage(chatId, message, keyboard, userId);
-  }
+  if (bot) {
+   try {
+     bot.stopPolling();
+     console.log('✅ Бот остановлен');
+   } catch (error) {
+     console.error('❌ Ошибка остановки бота:', error);
+   }
+ }
+ 
+ server.close((err) => {
+   if (err) {
+     console.error('❌ Ошибка закрытия сервера:', err);
+     process.exit(1);
+   }
+   console.log('✅ Сервер остановлен');
+   process.exit(0);
+ });
+ 
+ setTimeout(() => {
+   console.log('⏰ Принудительное завершение');
+   process.exit(1);
+ }, 10000);
 }
 
-async function showTypeMenu(chatId, userId) {
-  const typeButtons = Object.entries(messageTypes).map(([key, value]) => [{
-    text: value,
-    callback_data: `type_${key}`
-  }]);
-  
-  typeButtons.push([{ text: '◀️ Назад к настройкам', callback_data: 'back_to_settings' }]);
+process.on('uncaughtException', (error) => {
+ console.error('❌ Необработанная ошибка:', error);
+ gracefulShutdown('uncaughtException');
+});
 
-  const keyboard = { reply_markup: { inline_keyboard: typeButtons } };
-  
-  const message = '💬 **Выберите тип уведомлений:**';
-  
-  if (userMenuMessages.has(userId)) {
-    try {
-      await editMenuMessage(chatId, userMenuMessages.get(userId), message, keyboard);
-    } catch (error) {
-      await sendMenuMessage(chatId, message, keyboard, userId);
-    }
-  } else {
-    await sendMenuMessage(chatId, message, keyboard, userId);
-  }
-}
+process.on('unhandledRejection', (reason) => {
+ console.error('❌ Необработанное отклонение промиса:', reason);
+ gracefulShutdown('unhandledRejection');
+});
+
+console.log('🎉 Сервер полностью инициализирован');
