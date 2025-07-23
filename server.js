@@ -305,11 +305,14 @@ bot.onText(/\/status/, async (msg) => {
 async function showMainMenu(chatId, userId) {
   const welcomeMessage = `🌟 **Развивайка - Главное меню**
 
+📱 Нажмите "🚀 Открыть приложение" чтобы начать!
+
 Выберите действие:`;
 
   const keyboard = {
     reply_markup: {
       inline_keyboard: [
+        [{ text: '🚀 Открыть приложение', web_app: { url: 'https://your-app-url.com' } }],
         [{ text: '⚙️ Настройки уведомлений', callback_data: 'settings' }],
         [{ text: '📊 Мой статус', callback_data: 'status' }],
         [{ text: '❓ Помощь', callback_data: 'help' }]
