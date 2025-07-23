@@ -465,6 +465,34 @@ app.get('/', (req, res) => {
   });
 });
 
+app.get('/api/telegram/status/:userId', (req, res) => {
+  const userId = req.params.userId;
+  
+  try {
+    const data = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
+    const user = data.users.find(u => u.userId === userId);
+    
+    if (user) {
+      res.json({
+        connected: true,
+        enabled: user.enabled,
+        time: user.time,
+        type: user.reminderType || 'motivational'
+      });
+    } else {
+      res.json({
+        connected: false,
+        enabled: false,
+        time: '19:00',
+        type: 'motivational'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Ошибка при получении статуса:', error);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 // Запуск сервера
 app.listen(PORT, () => {
   console.log('🚀 Сервер запущен на порту', PORT);
