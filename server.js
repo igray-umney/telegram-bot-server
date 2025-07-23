@@ -257,7 +257,7 @@ bot.onText(/\/start/, async (msg) => {
     const keyboard = {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🚀 Открыть приложение', web_app: { url: 'https://t.me/umney_kids_bot/umney_kids' } }],
+          [{ text: '🚀 Открыть приложение', web_app: { url: 'https://telegram-mini-app-gules-nine.vercel.app/' } }],
           [{ text: '⚙️ Настройки уведомлений', callback_data: 'settings' }],
           [{ text: '📊 Мой статус', callback_data: 'status' }],
           [{ text: '❓ Помощь', callback_data: 'help' }]
@@ -318,7 +318,7 @@ bot.onText(/\/app/, async (msg) => {
   const keyboard = {
     reply_markup: {
       inline_keyboard: [
-        [{ text: '🚀 Открыть приложение', web_app: { url: 'https://t.me/umney_kids_bot/umney_kids' } }],
+        [{ text: '🚀 Открыть приложение', web_app: { url: 'https://telegram-mini-app-gules-nine.vercel.app/' } }],
         [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
       ]
     }
@@ -338,7 +338,7 @@ async function showMainMenu(chatId, userId) {
   const keyboard = {
     reply_markup: {
       inline_keyboard: [
-        [{ text: '🚀 Открыть приложение', web_app: { url: 'https://t.me/umney_kids_bot/umney_kids' } }],
+        [{ text: '🚀 Открыть приложение', web_app: { url: 'https://telegram-mini-app-gules-nine.vercel.app/' } }],
         [{ text: '⚙️ Настройки уведомлений', callback_data: 'settings' }],
         [{ text: '📊 Мой статус', callback_data: 'status' }],
         [{ text: '❓ Помощь', callback_data: 'help' }]
@@ -473,7 +473,7 @@ async function showHelp(chatId, userId) {
   const keyboard = {
     reply_markup: {
       inline_keyboard: [
-        [{ text: '🚀 Открыть приложение', web_app: { url: 'https://t.me/umney_kids_bot/umney_kids' } }],
+        [{ text: '🚀 Открыть приложение', web_app: { url: 'https://telegram-mini-app-gules-nine.vercel.app/' } }],
         [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
       ]
     }
