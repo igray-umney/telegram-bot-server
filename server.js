@@ -565,6 +565,32 @@ async function showHelp(chatId, userId) {
   }
 }
 
+bot.on('pre_checkout_query', async (query) => {
+  console.log('💳 Pre-checkout query:', query);
+  
+  try {
+    // Проверяем данные платежа
+    const payload = query.invoice_payload;
+    
+    if (payload.startsWith('premium_') || payload.startsWith('stars_premium_')) {
+      // Подтверждаем платеж
+      await bot.answerPreCheckoutQuery(query.id, true);
+      console.log('✅ Pre-checkout подтвержден');
+    } else {
+      // Отклоняем неизвестный платеж
+      await bot.answerPreCheckoutQuery(query.id, false, {
+        error_message: 'Неизвестный тип платежа'
+      });
+      console.log('❌ Pre-checkout отклонен');
+    }
+  } catch (error) {
+    console.error('❌ Ошибка pre-checkout:', error);
+    await bot.answerPreCheckoutQuery(query.id, false, {
+      error_message: 'Ошибка обработки платежа'
+    });
+  }
+});
+
 // Обработка callback кнопок
 bot.on('callback_query', async (callbackQuery) => {
   const message = callbackQuery.message;
