@@ -610,6 +610,52 @@ bot.on('callback_query', async (callbackQuery) => {
   }
 });
 
+app.post('/api/telegram/create-stars-invoice', async (req, res) => {
+  const { userId, stars, description, payload } = req.body;
+  
+  try {
+    console.log('⭐ Создание Stars инвойса для пользователя:', userId);
+
+    const invoiceData = {
+      chat_id: userId,
+      title: 'Премиум подписка Развивайка',
+      description: description || 'Премиум подписка через Telegram Stars',
+      payload: payload || `stars_premium_${Date.now()}`,
+      currency: 'XTR', // Валюта для Stars
+      prices: [
+        {
+          label: 'Премиум подписка',
+          amount: stars || 50 // Количество звезд
+        }
+      ]
+    };
+
+    const response = await bot.sendInvoice(
+      invoiceData.chat_id,
+      invoiceData.title,
+      invoiceData.description,
+      invoiceData.payload,
+      '', // provider_token не нужен для Stars
+      invoiceData.currency,
+      invoiceData.prices
+    );
+
+    console.log('✅ Stars инвойс создан успешно');
+    res.json({ 
+      success: true, 
+      message: 'Stars инвойс создан',
+      invoiceId: response.message_id
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка создания Stars инвойса:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Ошибка создания Stars платежа: ' + error.message 
+    });
+  }
+});
+
 // Функции обработки действий
 async function toggleNotifications(chatId, userId) {
   const data = loadData();
