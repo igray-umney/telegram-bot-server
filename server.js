@@ -208,6 +208,78 @@ app.post('/api/telegram/connect', (req, res) => {
   }
 });
 
+app.post('/api/telegram/create-invoice', async (req, res) => {
+  const { userId, amount, description, payload } = req.body;
+  
+  try {
+    console.log('💳 Создание инвойса для пользователя:', userId);
+    
+    if (!PAYMENT_TOKEN) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Payment token не настроен' 
+      });
+    }
+
+    // Создаем инвойс через Telegram Bot API
+    const invoiceData = {
+      chat_id: userId,
+      title: 'Премиум подписка Развивайка',
+      description: description || 'Полный доступ ко всем функциям приложения',
+      payload: payload || `premium_${Date.now()}`,
+      provider_token: PAYMENT_TOKEN,
+      currency: 'RUB',
+      prices: [
+        {
+          label: 'Премиум подписка',
+          amount: (amount || 299) * 100 // Цена в копейках
+        }
+      ],
+      start_parameter: 'premium_subscription',
+      photo_url: 'https://your-domain.com/images/premium-badge.png', // Опционально
+      photo_size: 512,
+      photo_width: 512,
+      photo_height: 512,
+      need_name: false,
+      need_phone_number: false,
+      need_email: false,
+      need_shipping_address: false,
+      send_phone_number_to_provider: false,
+      send_email_to_provider: false,
+      is_flexible: false
+    };
+
+    const response = await bot.sendInvoice(invoiceData.chat_id, invoiceData.title, invoiceData.description, invoiceData.payload, invoiceData.provider_token, invoiceData.currency, invoiceData.prices, {
+      start_parameter: invoiceData.start_parameter,
+      photo_url: invoiceData.photo_url,
+      photo_size: invoiceData.photo_size,
+      photo_width: invoiceData.photo_width,
+      photo_height: invoiceData.photo_height,
+      need_name: invoiceData.need_name,
+      need_phone_number: invoiceData.need_phone_number,
+      need_email: invoiceData.need_email,
+      need_shipping_address: invoiceData.need_shipping_address,
+      send_phone_number_to_provider: invoiceData.send_phone_number_to_provider,
+      send_email_to_provider: invoiceData.send_email_to_provider,
+      is_flexible: invoiceData.is_flexible
+    });
+
+    console.log('✅ Инвойс создан успешно');
+    res.json({ 
+      success: true, 
+      message: 'Инвойс создан',
+      invoiceId: response.message_id
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка создания инвойса:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Ошибка создания платежа: ' + error.message 
+    });
+  }
+});
+
 // Обработчики бота
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
