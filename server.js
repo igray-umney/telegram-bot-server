@@ -524,6 +524,7 @@ async function showSettingsMenu(chatId, userId) {
         [{ text: `🌍 Город: ${user.timezone}`, callback_data: 'change_timezone' }],
         [{ text: `💬 Тип: ${messageTypes[user.reminderType]}`, callback_data: 'change_type' }],
         [{ text: '📱 Тест уведомления', callback_data: 'test_notification' }],
+        [{ text: '💳 Купить премиум', callback_data: 'buy_premium' }],
         [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
       ]
     }
@@ -691,6 +692,8 @@ bot.on('callback_query', async (callbackQuery) => {
       await showTypeMenu(message.chat.id, userId);
     } else if (data === 'test_notification') {
       await sendTestNotification(message.chat.id, userId);
+    } else if (data === 'buy_premium') {
+      await showPremiumMenu(message.chat.id, userId);
     } else if (data.startsWith('time_')) {
       const time = data.replace('time_', '');
       await setUserTime(message.chat.id, userId, time);
