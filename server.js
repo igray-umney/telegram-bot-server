@@ -694,6 +694,10 @@ bot.on('callback_query', async (callbackQuery) => {
       await sendTestNotification(message.chat.id, userId);
     } else if (data === 'buy_premium') {
       await showPremiumMenu(message.chat.id, userId);
+    } else if (data === 'pay_card') {
+      await createCardPayment(message.chat.id, userId);
+    } else if (data === 'pay_stars') {
+      await createStarsPayment(message.chat.id, userId);
     } else if (data.startsWith('time_')) {
       const time = data.replace('time_', '');
       await setUserTime(message.chat.id, userId, time);
