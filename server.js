@@ -1076,7 +1076,7 @@ async function createCardPayment(chatId, userId) {
       title: 'Премиум подписка Развивайка',
       description: 'Полный доступ ко всем функциям приложения на 1 месяц',
       payload: `premium_card_${userId}_${Date.now()}`,
-      provider_token: PAYMENT_TOKEN,
+      provider_token: PROVIDER_TOKEN,
       currency: 'RUB',
       prices: [
         {
