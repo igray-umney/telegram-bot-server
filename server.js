@@ -711,6 +711,32 @@ bot.on('callback_query', async (callbackQuery) => {
   }
 });
 
+app.get('/api/telegram/premium-status/:userId', (req, res) => {
+  const userId = req.params.userId;
+  
+  try {
+    const data = loadData();
+    const user = data.users.find(u => u.userId === userId);
+    
+    if (user) {
+      res.json({
+        isPremium: user.isPremium || false,
+        activatedAt: user.premiumActivatedAt || null,
+        paymentHistory: user.paymentHistory || []
+      });
+    } else {
+      res.json({
+        isPremium: false,
+        activatedAt: null,
+        paymentHistory: []
+      });
+    }
+  } catch (error) {
+    console.error('❌ Ошибка проверки премиум статуса:', error);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 app.post('/api/telegram/create-stars-invoice', async (req, res) => {
   const { userId, stars, description, payload } = req.body;
   
