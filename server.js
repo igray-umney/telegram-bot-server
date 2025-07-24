@@ -803,6 +803,19 @@ app.post('/api/telegram/create-stars-invoice', async (req, res) => {
   }
 });
 
+app.post('/api/telegram/create-card-invoice', async (req, res) => {
+  const { userId, amount } = req.body;
+  
+  try {
+    // Вызываем вашу существующую функцию
+    await createCardPayment(userId, userId); // chatId = userId для Telegram
+    res.json({ success: true, message: 'Инвойс отправлен в Telegram' });
+  } catch (error) {
+    console.error('❌ Ошибка создания инвойса:', error);
+    res.status(500).json({ success: false, message: 'Ошибка создания платежа' });
+  }
+});
+
 // Функции обработки действий
 async function toggleNotifications(chatId, userId) {
   const data = loadData();
