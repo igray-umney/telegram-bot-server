@@ -402,6 +402,81 @@ bot.onText(/\/app/, async (msg) => {
   bot.sendMessage(chatId, message, { parse_mode: 'Markdown', ...keyboard });
 });
 
+bot.on('successful_payment', async (msg) => {
+  console.log('💰 Успешный платеж:', msg.successful_payment);
+  
+  try {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id.toString();
+    const payment = msg.successful_payment;
+    
+    // Сохраняем информацию о платеже
+    const data = loadData();
+    let user = data.users.find(u => u.userId === userId);
+    
+    if (user) {
+      user.isPremium = true;
+      user.premiumActivatedAt = new Date().toISOString();
+      user.paymentHistory = user.paymentHistory || [];
+      user.paymentHistory.push({
+        id: payment.telegram_payment_charge_id,
+        amount: payment.total_amount,
+        currency: payment.currency,
+        payload: payment.invoice_payload,
+        timestamp: new Date().toISOString()
+      });
+      
+      saveData(data);
+      console.log('✅ Премиум активирован для пользователя:', userId);
+    }
+
+    // Отправляем сообщение об успешном платеже
+    const successMessage = payment.currency === 'XTR' 
+      ? `🌟 **Оплата через Stars успешна!**
+
+Спасибо за покупку! Премиум подписка активирована!
+
+💎 Теперь вам доступны:
+• Все активности без ограничений
+• Персональные программы развития  
+• Подробная аналитика прогресса
+• Эксклюзивные материалы
+
+🚀 Откройте приложение чтобы воспользоваться всеми возможностями!`
+      : `💳 **Оплата успешна!**
+
+Спасибо за покупку! Премиум подписка активирована!
+
+💰 Сумма: ${payment.total_amount / 100} ${payment.currency}
+📧 ID транзакции: ${payment.telegram_payment_charge_id}
+
+💎 Теперь вам доступны:
+• Все активности без ограничений
+• Персональные программы развития
+• Подробная аналитика прогресса
+• Эксклюзивные материалы
+
+🚀 Откройте приложение чтобы воспользоваться всеми возможностями!`;
+
+    const keyboard = {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🚀 Открыть приложение', web_app: { url: 'https://your-app-url.com' } }],
+          [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+        ]
+      }
+    };
+
+    await bot.sendMessage(chatId, successMessage, { 
+      parse_mode: 'Markdown',
+      ...keyboard
+    });
+
+  } catch (error) {
+    console.error('❌ Ошибка обработки успешного платежа:', error);
+  }
+});
+
 // Функции меню
 async function showMainMenu(chatId, userId) {
   const welcomeMessage = `🌟 **Развивайка - Главное меню**
