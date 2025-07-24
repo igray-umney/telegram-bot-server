@@ -477,6 +477,20 @@ bot.on('successful_payment', async (msg) => {
   }
 });
 
+bot.onText(/\/premium/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id.toString();
+  
+  // Удаляем команду пользователя
+  try {
+    await bot.deleteMessage(chatId, msg.message_id);
+  } catch (error) {
+    // Игнорируем
+  }
+  
+  showPremiumMenu(chatId, userId);
+});
+
 // Функции меню
 async function showMainMenu(chatId, userId) {
   const welcomeMessage = `🌟 **Развивайка - Главное меню**
