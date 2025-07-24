@@ -213,7 +213,7 @@ app.post('/api/telegram/create-invoice', async (req, res) => {
   try {
     console.log('💳 Создание инвойса для пользователя:', userId);
     
-    if (!PAYMENT_TOKEN) {
+    if (!PROVIDER_TOKEN) {
       return res.status(400).json({ 
         success: false, 
         message: 'Payment token не настроен' 
@@ -226,7 +226,7 @@ app.post('/api/telegram/create-invoice', async (req, res) => {
       title: 'Премиум подписка Развивайка',
       description: description || 'Полный доступ ко всем функциям приложения',
       payload: payload || `premium_${Date.now()}`,
-      provider_token: PAYMENT_TOKEN,
+      provider_token: PROVIDER_TOKEN,
       currency: 'RUB',
       prices: [
         {
@@ -1067,7 +1067,7 @@ async function showPremiumMenu(chatId, userId) {
 
 async function createCardPayment(chatId, userId) {
   try {
-    if (!PAYMENT_TOKEN) {
+    if (!PROVIDER_TOKEN) {
       await bot.sendMessage(chatId, '❌ Оплата картой временно недоступна');
       return;
     }
