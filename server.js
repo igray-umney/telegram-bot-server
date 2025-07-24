@@ -1048,6 +1048,96 @@ async function showPremiumMenu(chatId, userId) {
   }
 }
 
+async function createCardPayment(chatId, userId) {
+  try {
+    if (!PAYMENT_TOKEN) {
+      await bot.sendMessage(chatId, '❌ Оплата картой временно недоступна');
+      return;
+    }
+
+    const invoiceData = {
+      title: 'Премиум подписка Развивайка',
+      description: 'Полный доступ ко всем функциям приложения на 1 месяц',
+      payload: `premium_card_${userId}_${Date.now()}`,
+      provider_token: PAYMENT_TOKEN,
+      currency: 'RUB',
+      prices: [
+        {
+          label: 'Премиум подписка',
+          amount: 29900 // 299 рублей в копейках
+        }
+      ],
+      start_parameter: 'premium_subscription',
+      need_name: false,
+      need_phone_number: false,
+      need_email: false,
+      need_shipping_address: false,
+      send_phone_number_to_provider: false,
+      send_email_to_provider: false,
+      is_flexible: false
+    };
+
+    await bot.sendInvoice(
+      chatId,
+      invoiceData.title,
+      invoiceData.description,
+      invoiceData.payload,
+      invoiceData.provider_token,
+      invoiceData.currency,
+      invoiceData.prices,
+      {
+        start_parameter: invoiceData.start_parameter,
+        need_name: invoiceData.need_name,
+        need_phone_number: invoiceData.need_phone_number,
+        need_email: invoiceData.need_email,
+        need_shipping_address: invoiceData.need_shipping_address,
+        send_phone_number_to_provider: invoiceData.send_phone_number_to_provider,
+        send_email_to_provider: invoiceData.send_email_to_provider,
+        is_flexible: invoiceData.is_flexible
+      }
+    );
+
+    console.log('✅ Инвойс для оплаты картой отправлен');
+
+  } catch (error) {
+    console.error('❌ Ошибка создания инвойса:', error);
+    await bot.sendMessage(chatId, '❌ Ошибка создания платежа. Попробуйте позже.');
+  }
+}
+
+async function createStarsPayment(chatId, userId) {
+  try {
+    const invoiceData = {
+      title: 'Премиум подписка Развивайка',
+      description: 'Полный доступ ко всем функциям приложения через Telegram Stars',
+      payload: `stars_premium_${userId}_${Date.now()}`,
+      currency: 'XTR',
+      prices: [
+        {
+          label: 'Премиум подписка',
+          amount: 50 // 50 звезд
+        }
+      ]
+    };
+
+    await bot.sendInvoice(
+      chatId,
+      invoiceData.title,
+      invoiceData.description,
+      invoiceData.payload,
+      '', // provider_token не нужен для Stars
+      invoiceData.currency,
+      invoiceData.prices
+    );
+
+    console.log('✅ Stars инвойс отправлен');
+
+  } catch (error) {
+    console.error('❌ Ошибка создания Stars инвойса:', error);
+    await bot.sendMessage(chatId, '❌ Ошибка создания Stars платежа. Попробуйте позже.');
+  }
+}
+
 // Сообщения по типам
 function getMessagesForType(type) {
   const messages = {
