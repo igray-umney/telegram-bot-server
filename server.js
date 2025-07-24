@@ -5,15 +5,11 @@ const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 const path = require('path');
 const cron = require('node-cron');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
-
 const PAYMENT_TOKEN = process.env.PAYMENT_TOKEN || process.env.TELEGRAM_PAYMENT_TOKEN;
 const STARS_ENABLED = true; // Включить оплату через Stars
-
-const TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
 const PROVIDER_TOKEN = process.env.YUKASSA_PROVIDER_TOKEN; //
 
 // Middleware
