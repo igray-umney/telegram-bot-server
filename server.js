@@ -980,6 +980,74 @@ async function sendTestNotification(chatId, userId) {
   }
 }
 
+async function showPremiumMenu(chatId, userId) {
+  const data = loadData();
+  const user = data.users.find(u => u.userId === userId);
+  
+  if (user && user.isPremium) {
+    const message = `👑 **Премиум уже активен!**
+
+✅ Статус: Активен
+📅 Активирован: ${new Date(user.premiumActivatedAt).toLocaleDateString('ru-RU')}
+
+Все функции приложения доступны!`;
+
+    const keyboard = {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🚀 Открыть приложение', web_app: { url: 'https://your-app-url.com' } }],
+          [{ text: '◀️ Назад к настройкам', callback_data: 'back_to_settings' }]
+        ]
+      }
+    };
+
+    if (userMenuMessages.has(userId)) {
+      try {
+        await editMenuMessage(chatId, userMenuMessages.get(userId), message, keyboard);
+      } catch (error) {
+        await sendMenuMessage(chatId, message, keyboard, userId);
+      }
+    } else {
+      await sendMenuMessage(chatId, message, keyboard, userId);
+    }
+    return;
+  }
+
+  const message = `💎 **Премиум подписка Развивайка**
+
+🎯 **Что входит в премиум:**
+• Все активности без ограничений
+• Персональные программы развития
+• Подробная аналитика прогресса
+• Эксклюзивные материалы и видео
+• Приоритетная поддержка
+
+💰 **Стоимость:** 299₽/мес
+⭐ **Или:** 50 Telegram Stars
+
+Выберите способ оплаты:`;
+
+  const keyboard = {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '💳 Оплатить картой (299₽)', callback_data: 'pay_card' }],
+        [{ text: '⭐ Оплатить Stars (50⭐)', callback_data: 'pay_stars' }],
+        [{ text: '◀️ Назад к настройкам', callback_data: 'back_to_settings' }]
+      ]
+    }
+  };
+
+  if (userMenuMessages.has(userId)) {
+    try {
+      await editMenuMessage(chatId, userMenuMessages.get(userId), message, keyboard);
+    } catch (error) {
+      await sendMenuMessage(chatId, message, keyboard, userId);
+    }
+  } else {
+    await sendMenuMessage(chatId, message, keyboard, userId);
+  }
+}
+
 // Сообщения по типам
 function getMessagesForType(type) {
   const messages = {
