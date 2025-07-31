@@ -1133,7 +1133,7 @@ async function createStarsPayment(chatId, userId) {
       prices: [
         {
           label: 'Премиум подписка',
-          amount: 50 // 50 звезд
+          amount: 100 // 100 звезд
         }
       ]
     };
