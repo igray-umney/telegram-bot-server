@@ -266,8 +266,9 @@ app.post('/api/telegram/create-invoice', async (req, res) => {
     console.log('✅ Инвойс создан успешно');
     res.json({ 
       success: true, 
-      message: 'Инвойс создан',
-      invoiceId: response.message_id
+      message: 'Инвойс отправлен в Telegram',
+      invoiceId: response.message_id,
+      invoiceUrl: `https://t.me/${process.env.BOT_USERNAME}` // или можно убрать эту строку
     });
 
   } catch (error) {
