@@ -773,7 +773,7 @@ app.post('/api/telegram/create-stars-invoice', async (req, res) => {
       prices: [
         {
           label: 'Премиум подписка',
-          amount: stars || 50 // Количество звезд
+          amount: stars || 100 // Количество звезд
         }
       ]
     };
@@ -1041,7 +1041,7 @@ async function showPremiumMenu(chatId, userId) {
 • Приоритетная поддержка
 
 💰 **Стоимость:** 299₽/мес
-⭐ **Или:** 50 Telegram Stars
+⭐ **Или:** 100 Telegram Stars
 
 Выберите способ оплаты:`;
 
@@ -1049,7 +1049,7 @@ async function showPremiumMenu(chatId, userId) {
     reply_markup: {
       inline_keyboard: [
         [{ text: '💳 Оплатить картой (299₽)', callback_data: 'pay_card' }],
-        [{ text: '⭐ Оплатить Stars (50⭐)', callback_data: 'pay_stars' }],
+        [{ text: '⭐ Оплатить Stars (100⭐)', callback_data: 'pay_stars' }],
         [{ text: '◀️ Назад к настройкам', callback_data: 'back_to_settings' }]
       ]
     }
